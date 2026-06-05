@@ -202,10 +202,8 @@ export default function App() {
       hlsInstance.current = null;
     }
 
-    // @ts-ignore (Hls is loaded globally in index.html)
-    if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-      // @ts-ignore
-      const hls = new Hls({
+    if (typeof (window as any).Hls !== 'undefined' && (window as any).Hls.isSupported()) {
+      const hls = new (window as any).Hls({
         enableWorker: true,
         maxBufferLength: 30,
         lowLatencyMode: true,
@@ -213,17 +211,17 @@ export default function App() {
       hlsInstance.current = hls;
       hls.loadSource(url);
       hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      hls.on((window as any).Hls.Events.MANIFEST_PARSED, () => {
         video.play().catch(e => console.log("Auto play prevented:", e));
       });
-      hls.on(Hls.Events.ERROR, function (event: any, data: any) {
+      hls.on((window as any).Hls.Events.ERROR, function (_event: any, data: any) {
         if (data.fatal) {
           switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
+            case (window as any).Hls.ErrorTypes.NETWORK_ERROR:
               console.log("HLS Network Error, attempting recovery...");
               hls.startLoad();
               break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
+            case (window as any).Hls.ErrorTypes.MEDIA_ERROR:
               console.log("HLS Media Error, attempting recovery...");
               hls.recoverMediaError();
               break;
