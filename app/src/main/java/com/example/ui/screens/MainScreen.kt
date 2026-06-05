@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.TvChannel
 import com.example.ui.components.ChannelListItem
+import com.example.ui.components.ChannelResponsiveGrid
 import com.example.ui.components.IptvVideoPlayer
 import com.example.ui.components.PlaylistImportSection
 import com.example.ui.components.SettingsDialog
@@ -458,6 +459,7 @@ fun MainScreen(
 
     var showSettingsDialog by remember { mutableStateOf(false) }
     var currentTab by remember { mutableStateOf(TvTab.LIVE_TV) }
+    var isGridView by remember { mutableStateOf(true) }
 
     // Categories calculation
     val categories = remember(rawChannels, favoriteIds) {
@@ -884,23 +886,52 @@ fun MainScreen(
                                         currentSortOrder = currentSortOrder,
                                         onSortOrderChange = { viewModel.setSortOrder(it) }
                                     )
+
+                                    IconButton(
+                                        onClick = { isGridView = !isGridView },
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(
+                                                color = Color.White.copy(alpha = 0.08f),
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                            .testTag("toggle_view_mode")
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isGridView) Icons.Filled.ViewList else Icons.Filled.GridView,
+                                            contentDescription = "Toggle view style",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
 
 
 
-                                // Interactive Channel matches list
+                                // Interactive Channel matches list or grid
                                 if (channels.isNotEmpty()) {
-                                    LazyColumn(
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        items(channels) { ch ->
-                                            ChannelListItem(
-                                                channel = ch,
-                                                isSelected = selectedChannel?.id == ch.id,
-                                                onSelect = { viewModel.selectChannel(ch) },
-                                                onToggleFavorite = { viewModel.toggleFavorite(ch) }
-                                            )
+                                    if (isGridView) {
+                                        ChannelResponsiveGrid(
+                                            channels = channels,
+                                            selectedChannel = selectedChannel,
+                                            onChannelSelect = { viewModel.selectChannel(it) },
+                                            onToggleFavorite = { viewModel.toggleFavorite(it) },
+                                            modifier = Modifier.fillMaxSize(),
+                                            useSimulatedFetch = true
+                                        )
+                                    } else {
+                                        LazyColumn(
+                                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            items(channels) { ch ->
+                                                ChannelListItem(
+                                                    channel = ch,
+                                                    isSelected = selectedChannel?.id == ch.id,
+                                                    onSelect = { viewModel.selectChannel(ch) },
+                                                    onToggleFavorite = { viewModel.toggleFavorite(ch) }
+                                                )
+                                            }
                                         }
                                     }
                                 } else {
@@ -963,6 +994,8 @@ fun VerticalChannelDrawer(
     onToggleFavorite: (TvChannel) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isGridView by remember { mutableStateOf(true) }
+
     Column(modifier = modifier) {
         // Search & Sort bar Row
         Row(
@@ -991,6 +1024,24 @@ fun VerticalChannelDrawer(
                 currentSortOrder = sortOrder,
                 onSortOrderChange = onSortOrderChange
             )
+
+            IconButton(
+                onClick = { isGridView = !isGridView },
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(
+                        color = Color.White.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .testTag("drawer_toggle_view_mode")
+            ) {
+                Icon(
+                    imageVector = if (isGridView) Icons.Filled.ViewList else Icons.Filled.GridView,
+                    contentDescription = "Toggle view style",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
 
         // Active Category Filter Indicator Label
@@ -1023,19 +1074,30 @@ fun VerticalChannelDrawer(
 
         Divider(color = Color.DarkGray, modifier = Modifier.padding(bottom = 8.dp))
 
-        // Large Channels List
+        // Large Channels List or Grid
         if (channels.isNotEmpty()) {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(channels) { ch ->
-                    ChannelListItem(
-                        channel = ch,
-                        isSelected = selectedChannel?.id == ch.id,
-                        onSelect = { onChannelSelect(ch) },
-                        onToggleFavorite = { onToggleFavorite(ch) }
-                    )
+            if (isGridView) {
+                ChannelResponsiveGrid(
+                    channels = channels,
+                    selectedChannel = selectedChannel,
+                    onChannelSelect = onChannelSelect,
+                    onToggleFavorite = onToggleFavorite,
+                    modifier = Modifier.fillMaxSize(),
+                    useSimulatedFetch = true
+                )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(channels) { ch ->
+                        ChannelListItem(
+                            channel = ch,
+                            isSelected = selectedChannel?.id == ch.id,
+                            onSelect = { onChannelSelect(ch) },
+                            onToggleFavorite = { onToggleFavorite(ch) }
+                        )
+                    }
                 }
             }
         } else {
