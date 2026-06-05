@@ -12,11 +12,16 @@ import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -34,30 +39,62 @@ fun ChannelListItem(
     onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isFocused by remember { mutableStateOf(false) }
+    var isFavoriteButtonFocused by remember { mutableStateOf(false) }
+
     val containerBg by animateColorAsState(
-        targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-        } else {
-            Color.DarkGray.copy(alpha = 0.2f)
+        targetValue = when {
+            isFocused -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+            isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            else -> Color.DarkGray.copy(alpha = 0.2f)
         },
         label = "containerBg"
     )
 
-    val borderBrush = if (isSelected) {
-        Brush.horizontalGradient(
+    val borderBrush = when {
+        isFocused -> Brush.horizontalGradient(
+            colors = listOf(
+                Color(0xFFF1C40F), // Bright Yellow highlight for TV remote focus
+                Color(0xFFE67E22)
+            )
+        )
+        isSelected -> Brush.horizontalGradient(
             colors = listOf(
                 MaterialTheme.colorScheme.primary,
                 MaterialTheme.colorScheme.secondary
             )
         )
-    } else {
-        null
+        else -> null
     }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = containerBg),
         modifier = modifier
             .fillMaxWidth()
+            .onFocusChanged { isFocused = it.isFocused }
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    val keyCode = keyEvent.nativeKeyEvent.keyCode
+                    when (keyCode) {
+                        android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                        android.view.KeyEvent.KEYCODE_ENTER -> {
+                            onSelect()
+                            true
+                        }
+                        android.view.KeyEvent.KEYCODE_F,
+                        android.view.KeyEvent.KEYCODE_5,
+                        android.view.KeyEvent.KEYCODE_NUMPAD_5,
+                        android.view.KeyEvent.KEYCODE_PROG_YELLOW,
+                        android.view.KeyEvent.KEYCODE_BOOKMARK -> {
+                            onToggleFavorite()
+                            true
+                        }
+                        else -> false
+                    }
+                } else {
+                    false
+                }
+            }
             .clickable { onSelect() }
             .clip(MaterialTheme.shapes.medium)
             .testTag("channel_item_${channel.id}"),
@@ -135,7 +172,7 @@ fun ChannelListItem(
                             modifier = Modifier.padding(start = 4.dp)
                         ) {
                             Text(
-                                text = "সরাসরি लाइव • LIVE",
+                                text = "সরাসরি লাইভ • LIVE",
                                 color = Color.White,
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
@@ -176,10 +213,16 @@ fun ChannelListItem(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Toggle favorite
+            // Toggle favorite (also focusable for D-pad spatial targeting)
             IconButton(
                 onClick = onToggleFavorite,
-                modifier = Modifier.testTag("favorite_button_${channel.id}")
+                modifier = Modifier
+                    .testTag("favorite_button_${channel.id}")
+                    .onFocusChanged { isFavoriteButtonFocused = it.isFocused }
+                    .background(
+                        color = if (isFavoriteButtonFocused) Color.White.copy(alpha = 0.25f) else Color.Transparent,
+                        shape = CircleShape
+                    )
             ) {
                 Icon(
                     imageVector = if (channel.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,

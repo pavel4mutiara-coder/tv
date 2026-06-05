@@ -118,10 +118,19 @@ object DefaultChannels {
             id = "dw_news",
             name = "DW News English Live",
             logoUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Deutsche_Welle_logo.svg/330px-Deutsche_Welle_logo.svg.png",
-            streamUrl = "https://dwstream72-lh.akamaihd.net/i/dwen_0@318496/index_1_av-p.m3u8",
+            streamUrl = "https://dwamdstream102.akamaized.net/hls/live/2013532/dwstream102/index.m3u8",
             category = "News (সংবাদ)",
             country = "Germany / Europe",
             description = "Deutsche Welle international broadcast with direct, reliable news, analytics, and documentaries from Germany."
+        ),
+        DefaultChannel(
+            id = "france_24_en",
+            name = "France 24 English Live",
+            logoUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/FRANCE_24_Logo.svg/330px-FRANCE_24_Logo.svg.png",
+            streamUrl = "https://static.france24.com/live/F24_EN_HI_HLS/live_web.m3u8",
+            category = "News (সংবাদ)",
+            country = "France / Europe",
+            description = "France 24 English provides around-the-clock international news coverage from a French perspective."
         ),
         DefaultChannel(
             id = "bloomberg_tv",

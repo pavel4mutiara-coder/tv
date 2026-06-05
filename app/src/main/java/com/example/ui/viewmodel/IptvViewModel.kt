@@ -23,6 +23,37 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
     val searchQuery = MutableStateFlow("")
     val selectedCategory = MutableStateFlow("All")
 
+    private val prefs = application.getSharedPreferences("globus_tv_settings", android.content.Context.MODE_PRIVATE)
+    val autoPlayOnSelect = MutableStateFlow(prefs.getBoolean("autoplay_on_select", true))
+
+    fun setAutoPlayOnSelect(enabled: Boolean) {
+        autoPlayOnSelect.value = enabled
+        prefs.edit().putBoolean("autoplay_on_select", enabled).apply()
+    }
+
+    val currentSortOrder = MutableStateFlow(
+        try {
+            SortOrder.valueOf(prefs.getString("sort_order", SortOrder.TRENDING.name) ?: SortOrder.TRENDING.name)
+        } catch (e: Exception) {
+            SortOrder.TRENDING
+        }
+    )
+
+    fun setSortOrder(order: SortOrder) {
+        currentSortOrder.value = order
+        prefs.edit().putString("sort_order", order.name).apply()
+    }
+
+    val playCounts = MutableStateFlow<Map<String, Int>>(emptyMap())
+
+    fun incrementPlayCount(channelId: String) {
+        val currentMap = playCounts.value.toMutableMap()
+        val nextVal = (currentMap[channelId] ?: 0) + 1
+        currentMap[channelId] = nextVal
+        playCounts.value = currentMap
+        prefs.edit().putInt("play_count_$channelId", nextVal).apply()
+    }
+
     val playlists: StateFlow<List<PlaylistEntity>> = repository.getPlaylists()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -62,9 +93,10 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
         channels,
         searchQuery,
         selectedCategory,
-        favoriteIds
-    ) { allChannels, query, category, favs ->
-        allChannels.filter { chan ->
+        currentSortOrder,
+        playCounts
+    ) { allChannels, query, category, sortOrder, counts ->
+        val filtered = allChannels.filter { chan ->
             val matchQuery = query.isEmpty() ||
                     chan.name.contains(query, ignoreCase = true) ||
                     chan.category.contains(query, ignoreCase = true) ||
@@ -72,11 +104,29 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
 
             val matchCategory = when (category) {
                 "All" -> true
-                "Favorites (পছন্দসই)" -> chan.id in favs
+                "Favorites (পছন্দসই)" -> chan.isFavorite
                 else -> chan.category == category
             }
 
             matchQuery && matchCategory
+        }
+
+        when (sortOrder) {
+            SortOrder.TRENDING -> {
+                filtered.sortedWith(
+                    compareByDescending<TvChannel> { counts[it.id] ?: 0 }
+                        .thenBy { it.name }
+                )
+            }
+            SortOrder.ALPHABETICAL -> {
+                filtered.sortedBy { it.name.lowercase() }
+            }
+            SortOrder.COUNTRY -> {
+                filtered.sortedWith(
+                    compareBy<TvChannel> { it.country.lowercase() }
+                        .thenBy { it.name.lowercase() }
+                )
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -87,6 +137,20 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
     val importState: StateFlow<ImportState> = _importState.asStateFlow()
 
     init {
+        // Load persistent play counts
+        val loaded = mutableMapOf<String, Int>()
+        try {
+            prefs.all.forEach { (key, value) ->
+                if (key.startsWith("play_count_") && value is Int) {
+                    val channelId = key.removePrefix("play_count_")
+                    loaded[channelId] = value
+                }
+            }
+        } catch (e: Exception) {
+            // fallback
+        }
+        playCounts.value = loaded
+
         viewModelScope.launch {
             channels.collectLatest { list ->
                 if (_selectedChannel.value == null && list.isNotEmpty()) {
@@ -98,6 +162,7 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectChannel(channel: TvChannel) {
         _selectedChannel.value = channel
+        incrementPlayCount(channel.id)
     }
 
     fun toggleFavorite(channel: TvChannel) {
@@ -158,4 +223,10 @@ sealed interface ImportState {
     object Loading : ImportState
     data class Success(val message: String) : ImportState
     data class Error(val message: String) : ImportState
+}
+
+enum class SortOrder(val displayNameEn: String, val displayNameBn: String) {
+    TRENDING("Trending", "ট্রেন্ডিং (জনপ্রিয়)"),
+    ALPHABETICAL("Alphabetical", "বর্ণানুক্রমিক (A-Z)"),
+    COUNTRY("Country", "দেশ অনুযায়ী")
 }
