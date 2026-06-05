@@ -13,7 +13,38 @@ interface TvChannel {
 }
 
 // Default channels imported from DefaultChannels.kt 
+// Default channels optimized for web streaming with CORS-enabled endpoints
 const INITIAL_CHANNELS: TvChannel[] = [
+  {
+    id: "mux_wildlife",
+    name: "Mux Wildlife Live Loop (CORS-Compliant)",
+    logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Red_Bull_TV_logo.svg/330px-Red_Bull_TV_logo.svg.png",
+    streamUrl: "https://stream.mux.com/v69ElvGePl29u00bTcHgFrZZ29Vb2C7w5.m3u8",
+    category: "Entertainment (বিনোদন)",
+    country: "International",
+    description: "Multi-bitrate standard CORS-enabled streaming broadcast featuring beautiful high-definition wildlife scenery.",
+    isFavorite: true
+  },
+  {
+    id: "sintel_cinematic",
+    name: "Sintel Cinematic Theme (CORS-Compliant)",
+    logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/FilmRise_logo.svg/512px-FilmRise_logo.svg.png",
+    streamUrl: "https://test-streams.mux.dev/x36xhg/master.m3u8",
+    category: "Movies (চলচ্চিত্র)",
+    country: "Europe / Global",
+    description: "Multi-language audio cinematic broadcast showing the beautiful Sintel trailer in standard high-definition adaptive stream.",
+    isFavorite: true
+  },
+  {
+    id: "big_buck_bunny",
+    name: "Big Buck Bunny HLS HD (CORS-Compliant)",
+    logoUrl: "https://images.foxtel.com.au/channel-logos/sky-sports-news.png",
+    streamUrl: "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
+    category: "Entertainment (বিনোদন)",
+    country: "Europe",
+    description: "Standard open source live stream of Big Buck Bunny cartoon with multiple quality selector tracks.",
+    isFavorite: false
+  },
   {
     id: "somoy_tv",
     name: "Somoy TV Live (সময় টিভি)",
@@ -21,8 +52,8 @@ const INITIAL_CHANNELS: TvChannel[] = [
     streamUrl: "https://somoylive.ebdcdn.com/live/somoyhd/playlist.m3u8",
     category: "News (সংবাদ)",
     country: "Bangladesh",
-    description: "Somoy News is one of the leading online news portals in Bangladesh. High quality live news 24/7.",
-    isFavorite: true
+    description: "Somoy News is one of the leading online news portals in Bangladesh. High quality live news 24/7 (CORS checks apply).",
+    isFavorite: false
   },
   {
     id: "jamuna_tv",
@@ -31,7 +62,7 @@ const INITIAL_CHANNELS: TvChannel[] = [
     streamUrl: "https://jamunalivey.ebdcdn.com/live/jamunahd/playlist.m3u8",
     category: "News (সংবাদ)",
     country: "Bangladesh",
-    description: "Jamuna Television is a 24-hour private television channel in Bangladesh. Delivering unbiased, fast live news feed.",
+    description: "Jamuna Television is a 24-hour private television channel in Bangladesh. Delivering unbiased, fast live news feed (CORS checks apply).",
     isFavorite: false
   },
   {
@@ -42,7 +73,7 @@ const INITIAL_CHANNELS: TvChannel[] = [
     category: "Sports (খেলাধুলা)",
     country: "United Kingdom",
     description: "Get the latest live breaking sports news, transfer updates, stats, and scores instantly from Sky Sports.",
-    isFavorite: true
+    isFavorite: false
   },
   {
     id: "red_bull_tv",
@@ -144,6 +175,8 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showFavoritesOnly, setShowFavoritesOnly] = useState<boolean>(false);
+  const [isMuted, setIsMuted] = useState<boolean>(true);
+  const [streamError, setStreamError] = useState<string | null>(null);
   
   // Custom channel drawer/form modal state
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
@@ -189,12 +222,20 @@ export default function App() {
     localStorage.setItem('globus_channels', JSON.stringify(updatedList));
   };
 
+  // Synergize browser volume syncing with React isMuted state
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted;
+    }
+  }, [isMuted]);
+
   // Video Streaming Playback Handler (using HLS.js)
   useEffect(() => {
     if (!videoRef.current || !activeChannel) return;
 
     const video = videoRef.current;
     const url = activeChannel.streamUrl;
+    setStreamError(null);
 
     // Destroy existing instance gracefully
     if (hlsInstance.current) {
@@ -212,7 +253,10 @@ export default function App() {
       hls.loadSource(url);
       hls.attachMedia(video);
       hls.on((window as any).Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(e => console.log("Auto play prevented:", e));
+        video.muted = isMuted;
+        video.play().catch(e => {
+          console.log("Auto play restricted by browser policy. Streaming is muted by default:", e);
+        });
       });
       hls.on((window as any).Hls.Events.ERROR, function (_event: any, data: any) {
         if (data.fatal) {
@@ -220,6 +264,7 @@ export default function App() {
             case (window as any).Hls.ErrorTypes.NETWORK_ERROR:
               console.log("HLS Network Error, attempting recovery...");
               hls.startLoad();
+              setStreamError("CORS Block or Server Offline: The broadcast server did not respond or blocked this website's access.");
               break;
             case (window as any).Hls.ErrorTypes.MEDIA_ERROR:
               console.log("HLS Media Error, attempting recovery...");
@@ -227,6 +272,7 @@ export default function App() {
               break;
             default:
               console.log("Fatal HLS Error, cannot recover automatically.");
+              setStreamError("Decoding state issue or server timeout on this live feed.");
               break;
           }
         }
@@ -234,8 +280,11 @@ export default function App() {
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Fallback for native Safari stream
       video.src = url;
+      video.muted = isMuted;
       video.addEventListener('loadedmetadata', () => {
-        video.play().catch(e => console.log("iOS Auto play prevented:", e));
+        video.play().catch(e => {
+          console.log("iOS Auto play prevented:", e);
+        });
       });
     }
 
@@ -348,14 +397,41 @@ export default function App() {
       {activeChannel ? (
         <section style={styles.playerSection}>
           <div style={styles.playerContainer}>
-            <video 
-              ref={videoRef}
-              controls 
-              autoPlay 
-              playsInline
-              style={styles.videoPlayer}
-              poster={activeChannel.logoUrl}
-            />
+            <div style={styles.playerWrapper}>
+              <video 
+                ref={videoRef}
+                controls 
+                autoPlay 
+                playsInline
+                muted={isMuted}
+                style={styles.videoPlayer}
+                poster={activeChannel.logoUrl}
+              />
+              {/* Autoplay Policy Quick Mute Alert overlay */}
+              {isMuted && (
+                <div style={styles.unmuteOverlay} onClick={() => setIsMuted(false)}>
+                  <div style={styles.unmuteBadge}>
+                    <span style={styles.unmuteBadgeIcon}>🔊</span>
+                    CLICK TO UNMUTE AUDIO
+                  </div>
+                </div>
+              )}
+
+              {/* Stream playback error guidelines overlay */}
+              {streamError && (
+                <div style={styles.errorOverlay}>
+                  <div style={styles.errorDialog}>
+                    <h4 style={styles.errorDialogTitle}>⚠️ Browser Streaming Limitation</h4>
+                    <p style={styles.errorDialogMessage}>{streamError}</p>
+                    <p style={styles.errorDialogHint}>
+                      Some corporate or regional networks require native hardware players or secure TV boxes and block direct web access due to CORS restrictions.
+                      Try selecting <strong>"Mux Wildlife Live Loop"</strong> or <strong>"Sintel Cinematic Theme"</strong> which are globally configured for web HLS streaming!
+                    </p>
+                    <button style={styles.errorDismissBtn} onClick={() => setStreamError(null)}>Dismiss</button>
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Live Indicator overlay on top right */}
             <div style={styles.liveIndicatorBadge}>
               <span style={styles.liveDot}></span>
@@ -387,16 +463,26 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Bookmark state */}
-              <button 
-                style={activeChannel.isFavorite ? styles.favoritedBtn : styles.favoriteBtn}
-                onClick={() => toggleFavorite(activeChannel.id)}
-              >
-                <svg style={styles.heartIcon} viewBox="0 0 24 24" fill={activeChannel.isFavorite ? "currentColor" : "none"} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-                {activeChannel.isFavorite ? 'BOOMARKED' : 'BOOMARK'}
-              </button>
+              <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center'}}>
+                {/* Dynamic Speaker Sound Button */}
+                <button 
+                  style={isMuted ? styles.mutedBtn : styles.unmutedBtn}
+                  onClick={() => setIsMuted(!isMuted)}
+                >
+                  <span style={{fontSize: '12px'}}>{isMuted ? '🔇 MUTED' : '🔊 LIVE AUDIO'}</span>
+                </button>
+
+                {/* Bookmark state */}
+                <button 
+                  style={activeChannel.isFavorite ? styles.favoritedBtn : styles.favoriteBtn}
+                  onClick={() => toggleFavorite(activeChannel.id)}
+                >
+                  <svg style={styles.heartIcon} viewBox="0 0 24 24" fill={activeChannel.isFavorite ? "currentColor" : "none"} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  {activeChannel.isFavorite ? 'BOOKMARKED' : 'BOOKMARK'}
+                </button>
+              </div>
             </div>
             <p style={styles.detailsDescription}>{activeChannel.description || "No supplemental details available for this channels. Connect your IPTV encoder to fetch detailed stream headers."}</p>
           </div>
@@ -728,6 +814,93 @@ const styles: { [key: string]: React.CSSProperties } = {
     width: '100%',
     height: '100%',
     objectFit: 'contain',
+    display: 'block',
+  },
+  playerWrapper: {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+  },
+  unmuteOverlay: {
+    position: 'absolute',
+    bottom: '16px',
+    left: '16px',
+    zIndex: 10,
+    cursor: 'pointer',
+  },
+  unmuteBadge: {
+    backgroundColor: 'rgba(59, 130, 246, 0.95)',
+    color: '#ffffff',
+    fontSize: '11px',
+    fontWeight: 800,
+    padding: '8px 14px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
+    letterSpacing: '0.5px',
+  },
+  unmuteBadgeIcon: {
+    fontSize: '14px',
+  },
+  errorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(11, 15, 25, 0.95)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '16px',
+    zIndex: 20,
+    backdropFilter: 'blur(6px)',
+  },
+  errorDialog: {
+    backgroundColor: '#151d30',
+    border: '1px solid #ef4444',
+    borderRadius: '12px',
+    padding: '24px',
+    maxWidth: '420px',
+    textAlign: 'center',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.6)',
+  },
+  errorDialogTitle: {
+    color: '#ef4444',
+    margin: '0 0 10px 0',
+    fontSize: '15px',
+    fontWeight: 800,
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+  },
+  errorDialogMessage: {
+    color: '#f8fafc',
+    fontSize: '13px',
+    lineHeight: '1.45',
+    margin: '0 0 14px 0',
+  },
+  errorDialogHint: {
+    color: '#94a3b8',
+    fontSize: '11px',
+    lineHeight: '1.45',
+    margin: '0 0 18px 0',
+  },
+  errorDismissBtn: {
+    backgroundColor: '#ef4444',
+    border: 'none',
+    color: '#ffffff',
+    padding: '8px 20px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
   },
   liveIndicatorBadge: {
     position: 'absolute',
@@ -849,6 +1022,34 @@ const styles: { [key: string]: React.CSSProperties } = {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     border: '1px solid #ef4444',
     color: '#ef4444',
+    borderRadius: '8px',
+    padding: '6px 12px',
+    fontSize: '11px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+  },
+  mutedBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    border: '1px solid #ef4444',
+    color: '#ef4444',
+    borderRadius: '8px',
+    padding: '6px 12px',
+    fontSize: '11px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+  },
+  unmutedBtn: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    border: '1px solid #10b981',
+    color: '#10b981',
     borderRadius: '8px',
     padding: '6px 12px',
     fontSize: '11px',
