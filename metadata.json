@@ -1,0 +1,6 @@
+{
+  "name": "Globus TV",
+  "description": "A professional live global TV and IPTV streaming platform, optimized for mobiles and Android TVs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
