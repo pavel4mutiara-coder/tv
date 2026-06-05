@@ -177,6 +177,15 @@ export default function App() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(true);
   const [streamError, setStreamError] = useState<string | null>(null);
+
+  // Filter channels based on Search, Category, and Favorites Toggle
+  const filteredChannels = channels.filter(ch => {
+    const matchesSearch = ch.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          ch.country.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = activeCategory === "All" || ch.category === activeCategory;
+    const matchesFavorite = !showFavoritesOnly || ch.isFavorite;
+    return matchesSearch && matchesCategory && matchesFavorite;
+  });
   
   // Custom channel drawer/form modal state
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
@@ -188,6 +197,20 @@ export default function App() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsInstance = useRef<any>(null);
+
+  // Keep the reference of playNextChannel up-to-date without recreating triggers
+  const playNextChannelRef = useRef<() => void>();
+  
+  useEffect(() => {
+    playNextChannelRef.current = () => {
+      if (filteredChannels.length <= 1) return;
+      const currentIndex = filteredChannels.findIndex(ch => ch.id === activeChannel?.id);
+      if (currentIndex !== -1) {
+        const nextIndex = (currentIndex + 1) % filteredChannels.length;
+        setActiveChannel(filteredChannels[nextIndex]);
+      }
+    };
+  }, [filteredChannels, activeChannel]);
 
   // Load from local storage or static array
   useEffect(() => {
@@ -243,6 +266,29 @@ export default function App() {
       hlsInstance.current = null;
     }
 
+    const playNext = () => {
+      if (playNextChannelRef.current) {
+        playNextChannelRef.current();
+      }
+    };
+
+    const handleEnded = () => {
+      console.log("Video playback ended naturally. Switching to next channel...");
+      playNext();
+    };
+
+    // When native video error or stall occurs
+    const handleVideoError = (e: any) => {
+      console.log("HTML5 Video Error details:", e);
+      const timer = setTimeout(() => {
+        playNext();
+      }, 3000);
+      (video as any)._errorTimer = timer;
+    };
+
+    video.addEventListener('ended', handleEnded);
+    video.addEventListener('error', handleVideoError);
+
     if (typeof (window as any).Hls !== 'undefined' && (window as any).Hls.isSupported()) {
       const hls = new (window as any).Hls({
         enableWorker: true,
@@ -265,6 +311,10 @@ export default function App() {
               console.log("HLS Network Error, attempting recovery...");
               hls.startLoad();
               setStreamError("CORS Block or Server Offline: The broadcast server did not respond or blocked this website's access.");
+              const netTimer = setTimeout(() => {
+                playNext();
+              }, 3000);
+              (video as any)._netTimer = netTimer;
               break;
             case (window as any).Hls.ErrorTypes.MEDIA_ERROR:
               console.log("HLS Media Error, attempting recovery...");
@@ -273,6 +323,10 @@ export default function App() {
             default:
               console.log("Fatal HLS Error, cannot recover automatically.");
               setStreamError("Decoding state issue or server timeout on this live feed.");
+              const defaultTimer = setTimeout(() => {
+                playNext();
+              }, 3000);
+              (video as any)._defTimer = defaultTimer;
               break;
           }
         }
@@ -289,6 +343,12 @@ export default function App() {
     }
 
     return () => {
+      video.removeEventListener('ended', handleEnded);
+      video.removeEventListener('error', handleVideoError);
+      if ((video as any)._errorTimer) clearTimeout((video as any)._errorTimer);
+      if ((video as any)._netTimer) clearTimeout((video as any)._netTimer);
+      if ((video as any)._defTimer) clearTimeout((video as any)._defTimer);
+
       if (hlsInstance.current) {
         hlsInstance.current.destroy();
         hlsInstance.current = null;
@@ -344,15 +404,6 @@ export default function App() {
 
   // Get dynamic unique categories
   const categories = ["All", ...new Set(channels.map(c => c.category))];
-
-  // Filter channels based on Search, Category, and Favorites Toggle
-  const filteredChannels = channels.filter(ch => {
-    const matchesSearch = ch.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          ch.country.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = activeCategory === "All" || ch.category === activeCategory;
-    const matchesFavorite = !showFavoritesOnly || ch.isFavorite;
-    return matchesSearch && matchesCategory && matchesFavorite;
-  });
 
   // Color generator for logo fallback text graphics
   const getLogoColors = (name: string) => {

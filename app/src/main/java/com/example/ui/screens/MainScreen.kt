@@ -458,6 +458,16 @@ fun MainScreen(
     val currentSortOrder by viewModel.currentSortOrder.collectAsState()
 
     var showSettingsDialog by remember { mutableStateOf(false) }
+
+    val playNextChannel = {
+        if (channels.isNotEmpty() && selectedChannel != null) {
+            val currentIndex = channels.indexOfFirst { it.id == selectedChannel?.id }
+            if (currentIndex != -1) {
+                val nextIndex = (currentIndex + 1) % channels.size
+                viewModel.selectChannel(channels[nextIndex])
+            }
+        }
+    }
     var currentTab by remember { mutableStateOf(TvTab.LIVE_TV) }
     var isGridView by remember { mutableStateOf(true) }
 
@@ -685,6 +695,7 @@ fun MainScreen(
                                     IptvVideoPlayer(
                                         channel = selectedChannel,
                                         autoPlayEnabled = autoPlayOnSelect,
+                                        onStreamFinishedOrFailed = playNextChannel,
                                         modifier = Modifier
                                             .clip(MaterialTheme.shapes.medium)
                                             .background(Color.Black)
@@ -795,7 +806,8 @@ fun MainScreen(
                             // Top Static Video Player
                             IptvVideoPlayer(
                                 channel = selectedChannel,
-                                autoPlayEnabled = autoPlayOnSelect
+                                autoPlayEnabled = autoPlayOnSelect,
+                                onStreamFinishedOrFailed = playNextChannel
                             )
 
                             // Playback info bar

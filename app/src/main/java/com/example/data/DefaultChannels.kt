@@ -46,7 +46,7 @@ object DefaultChannels {
             logoUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Red_Bull_TV_logo.svg/330px-Red_Bull_TV_logo.svg.png",
             streamUrl = "https://stream.mux.com/v69ElvGePl29u00bTcHgFrZZ29Vb2C7w5.m3u8",
             category = "Entertainment (বিনোদন)",
-            country: "International",
+            country = "International",
             description = "Multi-bitrate standard CORS-enabled streaming broadcast featuring beautiful high-definition wildlife scenery."
         ),
         DefaultChannel(
@@ -55,7 +55,7 @@ object DefaultChannels {
             logoUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/FilmRise_logo.svg/512px-FilmRise_logo.svg.png",
             streamUrl = "https://test-streams.mux.dev/x36xhg/master.m3u8",
             category = "Movies (চলচ্চিত্র)",
-            country: "Europe / Global",
+            country = "Europe / Global",
             description = "Multi-language audio cinematic broadcast showing the beautiful Sintel trailer in standard high-definition adaptive stream."
         ),
         DefaultChannel(

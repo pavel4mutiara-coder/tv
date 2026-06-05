@@ -35,7 +35,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.example.data.TvChannel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -43,9 +43,11 @@ fun IptvVideoPlayer(
     channel: TvChannel?,
     autoPlayEnabled: Boolean = true,
     modifier: Modifier = Modifier,
-    useController: Boolean = true
+    useController: Boolean = true,
+    onStreamFinishedOrFailed: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var originalAspectMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
 
     var isManualPlayTriggered by remember(channel) { mutableStateOf(false) }
@@ -76,6 +78,8 @@ fun IptvVideoPlayer(
                 playbackState = state
                 if (state == Player.STATE_READY) {
                     errorMessage = null
+                } else if (state == Player.STATE_ENDED) {
+                    onStreamFinishedOrFailed?.invoke()
                 }
             }
 
@@ -89,6 +93,13 @@ fun IptvVideoPlayer(
                     }
                     else -> {
                         "এই লাইভ স্ট্রিমটি বর্তমানে অফলাইন বা অনুপলব্ধ রয়েছে।\nThis channel stream is currently offline or unavailable.\n\nError details: $details (Code: ${error.errorCodeName})"
+                    }
+                }
+                scope.launch {
+                    delay(3000)
+                    // Double check if error state is still active so we don't skip channels mid-seek
+                    if (playbackState == Player.STATE_IDLE) {
+                        onStreamFinishedOrFailed?.invoke()
                     }
                 }
             }
